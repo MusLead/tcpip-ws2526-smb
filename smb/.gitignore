@@ -1,0 +1,15 @@
+# Build directory and object files
+build/
+*.o
+*.a
+
+# Compiled binaries
+smbbroker
+smbpublish
+smbsubscribe
+
+# General
+*.swp
+*.swo
+*~
+.DS_Store
