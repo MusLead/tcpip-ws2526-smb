@@ -31,7 +31,7 @@ static void subs_add_or_update(const char *topic, const struct sockaddr_in *src_
     }
 
     memset(&subs[subs_len], 0, sizeof(subs[subs_len]));
-    strncpy(subs[subs_len].topic, topic, TOPIC_MAX - 1);
+    snprintf(subs[subs_len].topic, TOPIC_MAX, "%s", topic);
     subs[subs_len].addr = *src_addr;
     subs[subs_len].port = port;
     subs_len++;

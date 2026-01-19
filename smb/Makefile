@@ -4,10 +4,9 @@ CFLAGS=-std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L
 # Build directory for object files
 BUILD_DIR=build
 
-TARGETS=smbbroker smbpublish smbsubscribe
 OBJ_FILES=$(BUILD_DIR)/smbbroker.o $(BUILD_DIR)/smbpublish.o $(BUILD_DIR)/smbsubscribe.o
 
-all: $(TARGETS)
+all: $(OBJ_FILES) 
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
