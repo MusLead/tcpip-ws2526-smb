@@ -1,5 +1,4 @@
 #include "smb.h"
-#include "smbbroker.h"
 
 typedef struct
 {
