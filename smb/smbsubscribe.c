@@ -1,4 +1,12 @@
 #include "smb.h"
+#include <signal.h>
+
+static volatile sig_atomic_t stop_requested = 0;
+
+static void handle_signal(int signo) {
+    (void)signo;
+    stop_requested = 1;
+}
 
 static uint16_t get_bound_port(int sock) {
     struct sockaddr_in a;
@@ -53,13 +61,22 @@ int main(int argc, char **argv) {
     printf("Subscribed to topic '%s' (listening on UDP port %u)\n", topic, (unsigned)myport);
     fflush(stdout);
 
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handle_signal;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+
     for (;;) {
+        if (stop_requested) break;
         char pkt[PACKET_MAX];
         struct sockaddr_in src;
         socklen_t srclen = sizeof(src);
 
         ssize_t n = recvfrom(sock, pkt, sizeof(pkt) - 1, 0, (struct sockaddr *)&src, &srclen);
         if (n < 0) {
+            if (errno == EINTR && stop_requested) break;
             perror("recvfrom");
             continue;
         }
@@ -84,6 +101,17 @@ int main(int argc, char **argv) {
 
         printf("[%s] %s\n", rtopic, p);
         fflush(stdout);
+    }
+
+    if (stop_requested) {
+        char unpkt[PACKET_MAX];
+        snprintf(unpkt, sizeof(unpkt), "UNSUB %s %u", topic, (unsigned)myport);
+        if (sendto(sock, unpkt, strlen(unpkt), 0, (struct sockaddr *)&broker_addr, sizeof(broker_addr)) < 0) {
+            perror("sendto UNSUB");
+        } else {
+            printf("Unsubscribed from topic '%s'\n", topic);
+            fflush(stdout);
+        }
     }
 
     close(sock);
