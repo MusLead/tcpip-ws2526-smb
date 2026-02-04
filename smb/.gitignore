@@ -1,5 +1,6 @@
 # Build directory and object files
 build/
+bin/
 *.o
 *.a
 
@@ -7,6 +8,8 @@ build/
 smbbroker
 smbpublish
 smbsubscribe
+smbpublish_loop
+smbpublish_interactive
 
 # General
 *.swp

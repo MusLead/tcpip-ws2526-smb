@@ -3,11 +3,22 @@
 
 static volatile sig_atomic_t stop_requested = 0;
 
+/**
+ * Signal handler to set the stop_requested flag when SIGINT or SIGTERM is received.
+ * This allows the main loop to exit gracefully and perform cleanup.
+ * @param signo The signal number (ignored in this handler).
+ */
 static void handle_signal(int signo) {
     (void)signo;
     stop_requested = 1;
 }
 
+/**
+ * Get the local port number that the socket is bound to.
+ * This is used to find out which port the OS assigned when we bind to port 0.
+ * @param sock The socket file descriptor.
+ * @return The local port number in host byte order.
+ */
 static uint16_t get_bound_port(int sock) {
     struct sockaddr_in a;
     socklen_t alen = sizeof(a);
@@ -18,8 +29,8 @@ static uint16_t get_bound_port(int sock) {
 int main(int argc, char **argv) {
     if (argc != 3) {
         fprintf(stderr, "Usage: %s broker topic\n", argv[0]);
-        fprintf(stderr, "Example: %s localhost datum\n", argv[0]);
-        fprintf(stderr, "Example: %s 192.168.1.13 \"#\"\n", argv[0]);
+        fprintf(stderr, "Example: %s localhost zimmer/temperatur\n", argv[0]);
+        fprintf(stderr, "Example: %s 192.168.1.13 zimmer/#\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -28,6 +39,10 @@ int main(int argc, char **argv) {
 
     if (strlen(topic) >= TOPIC_MAX) {
         fprintf(stderr, "Topic too long (max %d)\n", TOPIC_MAX - 1);
+        return EXIT_FAILURE;
+    }
+    if (!is_valid_sub_topic(topic)) {
+        fprintf(stderr, "Invalid topic. Use oberthema/thema, or wildcard like oberthema/#, or '#'\n");
         return EXIT_FAILURE;
     }
 

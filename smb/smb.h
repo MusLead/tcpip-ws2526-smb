@@ -63,4 +63,38 @@ static inline int resolve_host_ipv4(const char *host, struct sockaddr_in *out, i
     return 0;
 }
 
+static inline int topic_has_wildcard(const char *topic) {
+    return topic && strchr(topic, '#') != NULL;
+}
+
+static inline int is_valid_pub_topic(const char *topic) {
+    if (!topic || topic[0] == '\0') return 0;
+    if (topic_has_wildcard(topic)) return 0;
+    const char *slash = strchr(topic, '/');
+    if (!slash) return 0;
+    if (slash == topic) return 0;
+    if (topic[strlen(topic) - 1] == '/') return 0;
+    return 1;
+}
+
+static inline int is_valid_sub_topic(const char *topic) {
+    if (!topic || topic[0] == '\0') return 0;
+    if (strcmp(topic, "#") == 0) return 1;
+
+    const char *hash = strchr(topic, '#');
+    if (hash) {
+        if (hash[1] != '\0') return 0;
+        if (hash == topic) return 0;
+        if (hash[-1] != '/') return 0;
+        if (hash == topic + 1) return 0; // "/#" -> empty prefix
+        return 1;
+    }
+
+    const char *slash = strchr(topic, '/');
+    if (!slash) return 0;
+    if (slash == topic) return 0;
+    if (topic[strlen(topic) - 1] == '/') return 0;
+    return 1;
+}
+
 #endif

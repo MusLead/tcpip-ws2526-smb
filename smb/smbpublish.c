@@ -3,8 +3,8 @@
 int main(int argc, char **argv) {
     if (argc != 4) {
         fprintf(stderr, "Usage: %s broker topic message\n", argv[0]);
-        fprintf(stderr, "Example: %s 127.0.0.1 datum 08.02.2021\n", argv[0]);
-        fprintf(stderr, "Example: %s smbserver test \"hallo welt!\"\n", argv[0]);
+        fprintf(stderr, "Example: %s 127.0.0.1 zimmer/temperatur 08.02.2021\n", argv[0]);
+        fprintf(stderr, "Example: %s smbserver zimmer/luftfeuchte \"hallo welt!\"\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -12,8 +12,8 @@ int main(int argc, char **argv) {
     const char *topic  = argv[2];
     const char *msg    = argv[3];
 
-    if (strcmp(topic, "#") == 0) {
-        fprintf(stderr, "Error: Publisher is not allowed to use wildcard topic '#'\n");
+    if (!is_valid_pub_topic(topic)) {
+        fprintf(stderr, "Error: invalid topic. Expected form oberthema/thema, wildcard '#' not allowed\n");
         return EXIT_FAILURE;
     }
 

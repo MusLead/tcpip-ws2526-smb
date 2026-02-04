@@ -89,9 +89,25 @@ static int subs_remove(const char *topic, const struct sockaddr_in *src_addr, ui
  */
 static int topic_matches(const char *sub_topic, const char *pub_topic)
 {
-    // Only feature required: '#' means "receive all"
     if (strcmp(sub_topic, "#") == 0)
         return 1;
+
+    const char *hash = strchr(sub_topic, '#');
+    if (hash)
+    {
+        // Expect "prefix/#"
+        if (hash[1] != '\0' || hash == sub_topic || hash[-1] != '/')
+            return 0;
+
+        size_t prefix_len = (size_t)(hash - sub_topic);
+        size_t prefix_no_slash = prefix_len - 1; // exclude trailing '/'
+
+        if (strncmp(pub_topic, sub_topic, prefix_no_slash) != 0)
+            return 0;
+
+        return pub_topic[prefix_no_slash] == '\0' || pub_topic[prefix_no_slash] == '/';
+    }
+
     return strcmp(sub_topic, pub_topic) == 0;
 }
 
@@ -146,10 +162,10 @@ void parsePackage(char packet[1400], char topic[256], char message[1024], int *r
             return;
         };
     }
-    // Enforce: publisher not allowed to use wildcard '#'
-    if (strcmp(topic, "#") == 0)
+    // Enforce: publisher not allowed to use wildcard '#' and requires hierarchical topic
+    if (!is_valid_pub_topic(topic))
     {
-        fprintf(stderr, "Rejected PUB with wildcard topic '#'\n");
+        fprintf(stderr, "Rejected PUB with invalid topic '%s'\n", topic);
         {
             *retFlag = 3;
             return;
@@ -226,6 +242,11 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Invalid SUB packet: %s\n", packet);
                 continue;
             }
+            if (!is_valid_sub_topic(topic))
+            {
+                fprintf(stderr, "Invalid SUB topic: %s\n", topic);
+                continue;
+            }
 
             // print Subscriber info
             char srcbuf[64];
@@ -248,6 +269,11 @@ int main(int argc, char **argv)
                 sub_port == 0 || sub_port > 65535)
             {
                 fprintf(stderr, "Invalid UNSUB packet: %s\n", packet);
+                continue;
+            }
+            if (!is_valid_sub_topic(topic))
+            {
+                fprintf(stderr, "Invalid UNSUB topic: %s\n", topic);
                 continue;
             }
 
@@ -304,6 +330,7 @@ int main(int argc, char **argv)
             continue;
         }
 
+        // Otherwise, unknown packet
         fprintf(stderr, "Unknown packet: %s\n", packet);
     }
 
