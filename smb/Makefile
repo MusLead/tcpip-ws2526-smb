@@ -3,28 +3,61 @@ CFLAGS=-std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L
 
 # Build directory for object files
 BUILD_DIR=build
+# Output directory for binaries
+BIN_DIR=bin
 
-OBJ_FILES=$(BUILD_DIR)/smbbroker.o $(BUILD_DIR)/smbpublish.o $(BUILD_DIR)/smbsubscribe.o
+BINARIES=smbbroker smbpublish smbsubscribe
+OBJ_FILES=$(BINARIES:%=$(BUILD_DIR)/%.o)
+BIN_PATHS=$(BINARIES:%=$(BIN_DIR)/%)
+ARGS?=
+BROKER_ARGS?=
+PUBLISH_ARGS?=
+SUBSCRIBE_ARGS?=
+RUN_GOALS=run-broker run-publish run-subscribe
 
-all: $(OBJ_FILES) 
+ifneq ($(filter $(RUN_GOALS),$(MAKECMDGOALS)),)
+RUN_ARGS := $(filter-out $(RUN_GOALS),$(MAKECMDGOALS))
+.PHONY: $(RUN_ARGS)
+$(RUN_ARGS):
+	@:
+endif
+
+BROKER_RUN_ARGS=$(if $(BROKER_ARGS),$(BROKER_ARGS),$(if $(ARGS),$(ARGS),$(RUN_ARGS)))
+PUBLISH_RUN_ARGS=$(if $(PUBLISH_ARGS),$(PUBLISH_ARGS),$(if $(ARGS),$(ARGS),$(RUN_ARGS)))
+SUBSCRIBE_RUN_ARGS=$(if $(SUBSCRIBE_ARGS),$(SUBSCRIBE_ARGS),$(if $(ARGS),$(ARGS),$(RUN_ARGS)))
+
+all: $(BIN_PATHS)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
 $(BUILD_DIR)/%.o: %.c smb.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-smbbroker: $(BUILD_DIR)/smbbroker.o
-	$(CC) $(CFLAGS) -o smbbroker $<
+$(BIN_DIR)/smbbroker: $(BUILD_DIR)/smbbroker.o | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $<
 
-smbpublish: $(BUILD_DIR)/smbpublish.o
-	$(CC) $(CFLAGS) -o smbpublish $<
+$(BIN_DIR)/smbpublish: $(BUILD_DIR)/smbpublish.o | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $<
 
-smbsubscribe: $(BUILD_DIR)/smbsubscribe.o
-	$(CC) $(CFLAGS) -o smbsubscribe $<
+$(BIN_DIR)/smbsubscribe: $(BUILD_DIR)/smbsubscribe.o | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $<
+
+run-broker: $(BIN_DIR)/smbbroker
+	./$(BIN_DIR)/smbbroker $(BROKER_RUN_ARGS)
+
+run-publish: $(BIN_DIR)/smbpublish
+	./$(BIN_DIR)/smbpublish $(PUBLISH_RUN_ARGS)
+
+run-subscribe: $(BIN_DIR)/smbsubscribe
+	./$(BIN_DIR)/smbsubscribe $(SUBSCRIBE_RUN_ARGS)
 
 clean:
-	rm -f smbbroker smbpublish smbsubscribe
+	rm -f $(BIN_PATHS)
 	rm -rf $(BUILD_DIR)
+	rm -rf $(BIN_DIR)
 
-.PHONY: all clean
+.PHONY: all clean run-broker run-publish run-subscribe

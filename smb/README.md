@@ -23,17 +23,32 @@ Wildcard:
 ## Build
 make
 
+Binaries are created in `bin/`:
+- `bin/smbbroker`
+- `bin/smbpublish <BROKER> <TOPIC> <MESSAGE>`
+- `bin/smbsubscribe <BROKER> <TOPIC>`
+
+Optional shortcuts:
+- `make run-broker 8080`
+- `make run-publish localhost datum "08.02.2021"`
+- `make run-subscribe localhost datum`
+
+If a message contains spaces, use:
+- `make run-publish PUBLISH_ARGS='localhost datum "hello world"'`
+
 ## Run
 Terminal 1:
-  ./smbbroker
-  (or ./smbbroker 8080)
+  make run-broker 8080
+  or:
+  ./bin/smbbroker 8080
 
 Terminal 2:
-  ./smbsubscribe localhost datum
+  make run-subscribe localhost datum
   or:
-  ./smbsubscribe localhost "#"
+  ./bin/smbsubscribe localhost "#"
   (Press Ctrl+C to unsubscribe)
 
 Terminal 3:
-  ./smbpublish localhost datum "08.02.2021"
-  ./smbpublish localhost test "hallo welt!"
+  make run-publish localhost datum "08.02.2021"
+  or:
+  ./bin/smbpublish localhost test "hallo welt!"
