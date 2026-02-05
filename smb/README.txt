@@ -65,6 +65,21 @@ Commands:
   gcc -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L smbpublish_loop.c -o bin/smbpublish_loop
   gcc -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L smbpublish_interactive.c -o bin/smbpublish_interactive
 
+PROJECT STRUCTURE
+Important source files (all in the same folder, e.g., smb):
+- smbbroker.c (UDP broker: manages subscriptions and forwards messages)
+- smbpublish.c (publisher: sends one message and exits)
+- smbsubscribe.c (subscriber: receives messages and prints them)
+- smbpublish_loop.c (additional publisher: sends periodically)
+- smbpublish_interactive.c (additional publisher: interactive CLI)
+- smb.h (shared constants and helper functions)
+- README.txt (documentation)
+
+Executables required to run the Main Feature:
+- bin/smbbroker
+- bin/smbpublish
+- bin/smbsubscribe
+
 HOW TO EXECUTE (BINARIES)
 Binaries are created in bin/:
 - bin/smbbroker
