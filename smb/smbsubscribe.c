@@ -1,3 +1,15 @@
+/*
+ *  smbsubscribe.c
+ *  Developed on: Feb 05, 2026
+ *      Author: Agha Muhammad Aslam
+ *
+ *  MAIN FEATURE
+ *  Subscribes to a topic and prints MSG packets.
+ *  Usage: smbsubscribe <broker> <topic>.
+ * 
+ *  ADDITIONAL FEATURE
+ *  Graceful shutdown on SIGINT: sends UNSUB before exiting.
+ */
 #include "smb.h"
 #include <signal.h>
 
@@ -38,15 +50,17 @@ int main(int argc, char **argv) {
     const char *broker = argv[1];
     const char *topic = (argc == 3) ? argv[2] : "#";
 
+    // Validate topic
     if (strlen(topic) >= TOPIC_MAX) {
         fprintf(stderr, "Topic too long (max %d)\n", TOPIC_MAX - 1);
         return EXIT_FAILURE;
     }
     if (!is_valid_sub_topic(topic)) {
-        fprintf(stderr, "Invalid topic. Use oberthema/thema, or wildcard like oberthema/#, or '#'\n");
+        fprintf(stderr, "Invalid topic. Use thema, oberthema/thema, wildcard like oberthema/# or '#'\n");
         return EXIT_FAILURE;
     }
 
+    // Create UDP socket
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) die("socket");
 
@@ -61,12 +75,14 @@ int main(int argc, char **argv) {
 
     uint16_t myport = get_bound_port(sock);
 
+    // Resolve broker address
     struct sockaddr_in broker_addr;
     if (resolve_host_ipv4(broker, &broker_addr, BROKER_PORT) != 0) {
         fprintf(stderr, "Cannot resolve broker host: %s\n", broker);
         return EXIT_FAILURE;
     }
 
+    // Send SUB packet
     char subpkt[PACKET_MAX];
     snprintf(subpkt, sizeof(subpkt), "SUB %s %u", topic, (unsigned)myport);
 
@@ -77,6 +93,7 @@ int main(int argc, char **argv) {
     printf("Subscribed to topic '%s' (listening on UDP port %u)\n", topic, (unsigned)myport);
     fflush(stdout);
 
+    // Setup signal handlers for graceful termination
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = handle_signal;
@@ -84,12 +101,14 @@ int main(int argc, char **argv) {
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
 
+    // Main loop: receive and print messages until stopped
     for (;;) {
         if (stop_requested) break;
         char pkt[PACKET_MAX];
         struct sockaddr_in src;
         socklen_t srclen = sizeof(src);
 
+        // Receive packet
         ssize_t n = recvfrom(sock, pkt, sizeof(pkt) - 1, 0, (struct sockaddr *)&src, &srclen);
         if (n < 0) {
             if (errno == EINTR && stop_requested) break;
@@ -98,6 +117,7 @@ int main(int argc, char **argv) {
         }
         pkt[n] = '\0';
 
+        // Parse packet
         if (strncmp(pkt, "MSG ", 4) != 0) {
             fprintf(stderr, "Unknown packet: %s\n", pkt);
             continue;
@@ -107,6 +127,7 @@ int main(int argc, char **argv) {
         const char *p = pkt + 4;
         while (*p == ' ') p++;
 
+        // Extract topic
         char rtopic[TOPIC_MAX];
         size_t i = 0;
         while (*p && *p != ' ' && i < TOPIC_MAX - 1) {
@@ -119,6 +140,7 @@ int main(int argc, char **argv) {
         fflush(stdout);
     }
 
+    // Send UNSUB packet before exiting
     if (stop_requested) {
         char unpkt[PACKET_MAX];
         snprintf(unpkt, sizeof(unpkt), "UNSUB %s %u", topic, (unsigned)myport);

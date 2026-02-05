@@ -1,3 +1,10 @@
+/*
+ *  smb.h
+ *  Developed on: Feb 05, 2026
+ *      Author: Agha Muhammad Aslam
+ *
+ *  Shared definitions and helper functions for the SMB programs.
+ */
 #ifndef SMB_H
 #define SMB_H
 
@@ -63,10 +70,20 @@ static inline int resolve_host_ipv4(const char *host, struct sockaddr_in *out, i
     return 0;
 }
 
+/**
+ * Check if a topic contains a wildcard character '#'.
+ * @param topic The topic string to check.
+ * @return 1 if the topic contains '#', 0 otherwise.
+ */
 static inline int topic_has_wildcard(const char *topic) {
     return topic && strchr(topic, '#') != NULL;
 }
 
+/**
+ * Validate a publish topic.
+ * @param topic The topic string to validate.
+ * @return 1 if valid, 0 otherwise.
+ */
 static inline int is_valid_pub_topic(const char *topic) {
     if (!topic || topic[0] == '\0') return 0;
     if (topic_has_wildcard(topic)) return 0;
@@ -78,6 +95,11 @@ static inline int is_valid_pub_topic(const char *topic) {
     return 1;
 }
 
+/**
+ * Validate a subscribe topic.
+ * @param topic The topic string to validate.
+ * @return 1 if valid, 0 otherwise.
+ */
 static inline int is_valid_sub_topic(const char *topic) {
     if (!topic || topic[0] == '\0') return 0;
     if (strcmp(topic, "#") == 0) return 1;

@@ -1,3 +1,12 @@
+/*
+ *  smbpublish_interactive.c
+ *  Developed on: Feb 05, 2026
+ *      Author: Agha Muhammad Aslam
+ *
+ *  ADDITIONAL FEATURE
+ *  Interactive publisher with /topic, /help, /quit.
+ *  Sends PUB messages to the broker and allows changing the topic on the fly.
+ */
 #include "smb.h"
 
 /**
@@ -33,9 +42,11 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    // Create UDP socket
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) die("socket");
 
+    // Resolve broker address
     struct sockaddr_in broker_addr;
     if (resolve_host_ipv4(broker, &broker_addr, BROKER_PORT) != 0) {
         fprintf(stderr, "Cannot resolve broker host: %s\n", broker);
@@ -56,6 +67,7 @@ int main(int argc, char **argv) {
         if (strncmp(line, "/quit", 5) == 0 || strncmp(line, "/exit", 5) == 0) {
             break;
         }
+
         if (strncmp(line, "/help", 5) == 0) {
             printf("Commands:\n");
             printf("  /topic <newtopic>   Change the publish topic\n");
@@ -64,6 +76,8 @@ int main(int argc, char **argv) {
             fflush(stdout);
             continue;
         }
+        
+        // Change topic command
         if (strncmp(line, "/topic ", 7) == 0) {
             const char *newtopic = line + 7;
             while (*newtopic == ' ') newtopic++;

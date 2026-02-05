@@ -1,3 +1,12 @@
+/*
+ *  smbpublish_loop.c
+ *  Developed on: Feb 05, 2026
+ *      Author: Agha Muhammad Aslam
+ *  
+ *  ADDITIONAL FEATURE
+ *  Periodically publishes counter + timestamp at a fixed interval.
+ *  Optional prefix is added before the counter.
+ */
 #include "smb.h"
 #include <signal.h>
 #include <time.h>
@@ -9,6 +18,12 @@ static void handle_signal(int signo) {
     stop_requested = 1;
 }
 
+/**
+ * Parse interval string to unsigned int.
+ * @param s Input string.
+ * @param out Output pointer for the parsed value.
+ * @return 0 on success, -1 on failure.
+ */
 static int parse_interval(const char *s, unsigned int *out) {
     if (!s || *s == '\0') return -1;
     char *end = NULL;
@@ -42,12 +57,14 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    // Parse interval in seconds
     unsigned int interval = 0;
     if (parse_interval(interval_str, &interval) != 0) {
         fprintf(stderr, "Invalid interval_seconds: %s (1..86400)\n", interval_str);
         return EXIT_FAILURE;
     }
 
+    // Create UDP socket
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) die("socket");
 
@@ -83,9 +100,10 @@ int main(int argc, char **argv) {
             snprintf(msg, sizeof(msg), "%lu %s", counter, ts);
         }
 
+        // Prepare and send PUB packet
         char pkt[PACKET_MAX];
         snprintf(pkt, sizeof(pkt), "PUB %s %s", topic, msg);
-
+        
         if (sendto(sock, pkt, strlen(pkt), 0, (struct sockaddr *)&broker_addr, sizeof(broker_addr)) < 0) {
             perror("sendto PUB");
         } else {

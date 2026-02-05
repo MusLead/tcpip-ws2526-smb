@@ -1,3 +1,12 @@
+/*
+ *  smbbroker.c
+ *  Developed on: Feb 05, 2026
+ *      Author: Agha Muhammad Aslam
+ *  
+ *  MAIN FEATURE
+ *  UDP broker that receives SUB/UNSUB/PUB and forwards MSG packets.
+ *  Keeps an in-memory subscription list and does not store messages.
+ */
 #include "smb.h"
 #include <signal.h>
 

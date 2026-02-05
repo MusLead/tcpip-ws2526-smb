@@ -1,3 +1,12 @@
+/*
+ *  smbpublish.c
+ *  Developed on: Feb 05, 2026
+ *      Author: Agha Muhammad Aslam
+ *  
+ *  MAIN FEATURE
+ *  Sends a single PUB <topic> <message> to the broker and exits.
+ *  Usage: smbpublish <broker> <topic> <message>.
+ */
 #include "smb.h"
 
 int main(int argc, char **argv) {
@@ -12,6 +21,8 @@ int main(int argc, char **argv) {
     const char *topic  = argv[2];
     char msgbuf[MESSAGE_MAX];
     size_t used = 0;
+
+    // Concatenate all message parts with spaces
     for (int i = 3; i < argc; i++) {
         const char *part = argv[i];
         size_t len = strlen(part);
@@ -46,18 +57,21 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    // Create UDP socket
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) die("socket");
 
+    // Resolve broker address
     struct sockaddr_in broker_addr;
     if (resolve_host_ipv4(broker, &broker_addr, BROKER_PORT) != 0) {
         fprintf(stderr, "Cannot resolve broker host: %s\n", broker);
         return EXIT_FAILURE;
     }
 
+    // Prepare and send PUB packet
     char pkt[PACKET_MAX];
     snprintf(pkt, sizeof(pkt), "PUB %s %s", topic, msg);
-
+    
     if (sendto(sock, pkt, strlen(pkt), 0, (struct sockaddr *)&broker_addr, sizeof(broker_addr)) < 0) {
         die("sendto PUB");
     }

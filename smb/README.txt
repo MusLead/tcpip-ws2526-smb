@@ -54,7 +54,9 @@ Wildcards:
 
 BUILD
 The project uses a shared header (smb.h) across multiple C files, so a Makefile
-ensures consistent compilation and linking.
+ensures consistent compilation and linking. Make sure that all C code files, 
+including the Makefile, are in the same folder. 
+For example, the folder could be called "smb"
 
 Commands:
   cd smb
