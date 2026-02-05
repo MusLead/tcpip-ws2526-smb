@@ -46,6 +46,7 @@ Wildcards:
 ## Build
 make
 
+## Run
 Binaries are created in `bin/`:
 - `bin/smbbroker`
 - `bin/smbpublish <BROKER> <TOPIC> <MESSAGE>`
@@ -70,7 +71,7 @@ If a message contains spaces, use:
 - `./bin/smbpublish_interactive localhost zimmer/temperatur`
 - Commands: `/topic <newtopic>`, `/help`, `/quit`
 
-## Run
+## Run Example
 Terminal 1:
   make run-broker BROKER_ARGS="8080 --key"
   or:
