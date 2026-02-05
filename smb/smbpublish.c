@@ -1,8 +1,8 @@
 #include "smb.h"
 
 int main(int argc, char **argv) {
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s broker topic message\n", argv[0]);
+    if (argc < 4) {
+        fprintf(stderr, "Usage: %s broker topic message...\n", argv[0]);
         fprintf(stderr, "Example: %s 127.0.0.1 zimmer/temperatur 08.02.2021\n", argv[0]);
         fprintf(stderr, "Example: %s smbserver zimmer/luftfeuchte \"hallo welt!\"\n", argv[0]);
         return EXIT_FAILURE;
@@ -10,10 +10,30 @@ int main(int argc, char **argv) {
 
     const char *broker = argv[1];
     const char *topic  = argv[2];
-    const char *msg    = argv[3];
+    char msgbuf[MESSAGE_MAX];
+    size_t used = 0;
+    for (int i = 3; i < argc; i++) {
+        const char *part = argv[i];
+        size_t len = strlen(part);
+        if (used != 0) {
+            if (used + 1 >= MESSAGE_MAX) {
+                fprintf(stderr, "Message too long (max %d)\n", MESSAGE_MAX - 1);
+                return EXIT_FAILURE;
+            }
+            msgbuf[used++] = ' ';
+        }
+        if (used + len >= MESSAGE_MAX) {
+            fprintf(stderr, "Message too long (max %d)\n", MESSAGE_MAX - 1);
+            return EXIT_FAILURE;
+        }
+        memcpy(msgbuf + used, part, len);
+        used += len;
+    }
+    msgbuf[used] = '\0';
+    const char *msg = msgbuf;
 
     if (!is_valid_pub_topic(topic)) {
-        fprintf(stderr, "Error: invalid topic. Expected form oberthema/thema, wildcard '#' not allowed\n");
+        fprintf(stderr, "Error: invalid topic. Expected form 'thema' or 'ober/thema', wildcard '#' not allowed\n");
         return EXIT_FAILURE;
     }
 
@@ -21,8 +41,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Topic too long (max %d)\n", TOPIC_MAX - 1);
         return EXIT_FAILURE;
     }
-    if (strlen(msg) >= MESSAGE_MAX) {
-        fprintf(stderr, "Message too long (max %d)\n", MESSAGE_MAX - 1);
+    if (msg[0] == '\0') {
+        fprintf(stderr, "Message must not be empty\n");
         return EXIT_FAILURE;
     }
 

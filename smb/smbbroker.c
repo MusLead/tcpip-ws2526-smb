@@ -1,4 +1,5 @@
 #include "smb.h"
+#include <signal.h>
 
 typedef struct
 {
@@ -10,6 +11,27 @@ typedef struct
 static subscription_t *subs = NULL; // dynamic array of subscriptions
 static size_t subs_len = 0; // current number of subscriptions
 static size_t subs_cap = 0; // current capacity of subscription array
+
+static volatile sig_atomic_t stop = 0;
+
+static void handle_signal(int sig)
+{
+    (void)sig;
+    stop = 1;
+}
+
+static void install_signal_handlers(void)
+{
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handle_signal;
+    sigemptyset(&sa.sa_mask);
+
+    if (sigaction(SIGINT, &sa, NULL) < 0)
+        die("Error installing SIGINT handler");
+    if (sigaction(SIGTERM, &sa, NULL) < 0)
+        die("Error installing SIGTERM handler");
+}
 
 /**
  * Add a new subscription or update an existing one.
@@ -83,6 +105,7 @@ static int subs_remove(const char *topic, const struct sockaddr_in *src_addr, ui
 /**
  * Check if a published topic matches a subscribed topic.
  * Supports only '#' wildcard for "all topics".
+ * Wildcard means "this level and all sub-levels". 
  * @param sub_topic The subscribed topic (may contain '#').
  * @param pub_topic The published topic.
  * @return 1 if matches, 0 otherwise.
@@ -133,7 +156,7 @@ static void print_addr(const struct sockaddr_in *a, char *buf, size_t buflen)
  */
 void parsePackage(char packet[1400], char topic[256], char message[1024], int *retFlag)
 {
-    *retFlag = 1;
+    *retFlag = 1; // default to success
     // Parse topic first, then remainder as message (including spaces)
     const char *p = packet + 4;
     while (*p == ' ')
@@ -158,7 +181,7 @@ void parsePackage(char packet[1400], char topic[256], char message[1024], int *r
     {
         fprintf(stderr, "Invalid PUB packet: %s\n", packet);
         {
-            *retFlag = 3;
+            *retFlag = 3; // error
             return;
         };
     }
@@ -167,7 +190,7 @@ void parsePackage(char packet[1400], char topic[256], char message[1024], int *r
     {
         fprintf(stderr, "Rejected PUB with invalid topic '%s'\n", topic);
         {
-            *retFlag = 3;
+            *retFlag = 3;// error
             return;
         };
     }
@@ -175,6 +198,8 @@ void parsePackage(char packet[1400], char topic[256], char message[1024], int *r
 
 int main(int argc, char **argv)
 {
+    install_signal_handlers();
+
     int port = BROKER_PORT;
     if (argc == 2)
     {
@@ -210,8 +235,8 @@ int main(int argc, char **argv)
     printf("smbbroker listening on UDP port %d\n", port);
     fflush(stdout);
 
-    // Unlimited loop
-    for (;;)
+    // Main loop
+    while (!stop)
     {
         char packet[PACKET_MAX]; // packet is topic+message
         // sender address
@@ -222,6 +247,12 @@ int main(int argc, char **argv)
         ssize_t n = recvfrom(sock, packet, sizeof(packet) - 1, 0, (struct sockaddr *)&src, &srclen);
         if (n < 0)
         {
+            if (errno == EINTR)
+            {
+                if (stop)
+                    break;
+                continue;
+            }
             perror("Error receiving packet");
             continue;
         }
@@ -334,6 +365,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Unknown packet: %s\n", packet);
     }
 
+    free(subs);
     close(sock);
     return 0;
 }

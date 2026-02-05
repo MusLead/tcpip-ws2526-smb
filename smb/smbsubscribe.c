@@ -27,15 +27,16 @@ static uint16_t get_bound_port(int sock) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s broker topic\n", argv[0]);
+    if (argc != 2 && argc != 3) {
+        fprintf(stderr, "Usage: %s broker [topic]\n", argv[0]);
         fprintf(stderr, "Example: %s localhost zimmer/temperatur\n", argv[0]);
         fprintf(stderr, "Example: %s 192.168.1.13 zimmer/#\n", argv[0]);
+        fprintf(stderr, "Example: %s localhost   (defaults to '#')\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     const char *broker = argv[1];
-    const char *topic = argv[2];
+    const char *topic = (argc == 3) ? argv[2] : "#";
 
     if (strlen(topic) >= TOPIC_MAX) {
         fprintf(stderr, "Topic too long (max %d)\n", TOPIC_MAX - 1);
