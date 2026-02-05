@@ -1,4 +1,5 @@
 #include "smb.h"
+#include "smb_secure.h"
 
 /**
  * Trim trailing newline and carriage return characters from a string.
@@ -13,23 +14,32 @@ static void trim_newline(char *s) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s broker topic\n", argv[0]);
-        fprintf(stderr, "Example: %s localhost zimmer/temperatur\n", argv[0]);
+    const char *key_path = NULL;
+    char *pos[2];
+    int pos_count = smb_parse_key_and_pos(argc, argv, &key_path, pos, 2);
+    if (pos_count != 2) {
+        fprintf(stderr, "Usage: %s broker topic [--key[=<path>]]\n", argv[0]);
+        fprintf(stderr, "Example: %s localhost zimmer/temperatur --key\n", argv[0]);
         fprintf(stderr, "Commands: /topic <newtopic>, /help, /quit\n");
         return EXIT_FAILURE;
     }
 
-    const char *broker = argv[1];
+    const char *broker = pos[0];
     char topic[TOPIC_MAX];
-    if (strlen(argv[2]) >= TOPIC_MAX) {
+    if (strlen(pos[1]) >= TOPIC_MAX) {
         fprintf(stderr, "Topic too long (max %d)\n", TOPIC_MAX - 1);
         return EXIT_FAILURE;
     }
-    snprintf(topic, sizeof(topic), "%s", argv[2]);
+    snprintf(topic, sizeof(topic), "%s", pos[1]);
 
     if (!is_valid_pub_topic(topic)) {
         fprintf(stderr, "Error: invalid topic. Expected form oberthema/thema, wildcard '#' not allowed\n");
+        return EXIT_FAILURE;
+    }
+
+    uint8_t key[SMB_KEY_LEN];
+    if (smb_load_key(key, key_path) != 0) {
+        fprintf(stderr, "Missing key. Use --key[=<path>], or set SMB_KEY, or create %s\n", SMB_DEFAULT_KEY_PATH);
         return EXIT_FAILURE;
     }
 
@@ -87,11 +97,17 @@ int main(int argc, char **argv) {
         }
 
         // Construct the PUB packet
-        char pkt[PACKET_MAX];
-        snprintf(pkt, sizeof(pkt), "PUB %s %s", topic, line);
+        char plain[PACKET_MAX];
+        snprintf(plain, sizeof(plain), "PUB %s %s", topic, line);
+        uint8_t pkt[PACKET_MAX];
+        size_t pkt_len = smb_secure_pack(key, (const uint8_t *)plain, strlen(plain), pkt, sizeof(pkt));
+        if (pkt_len == 0) {
+            fprintf(stderr, "Message too large to secure\n");
+            continue;
+        }
 
         // Send the PUB packet to the broker
-        if (sendto(sock, pkt, strlen(pkt), 0, (struct sockaddr *)&broker_addr, sizeof(broker_addr)) < 0) {
+        if (sendto(sock, pkt, pkt_len, 0, (struct sockaddr *)&broker_addr, sizeof(broker_addr)) < 0) {
             perror("sendto PUB");
         } else {
             printf("[PUB %s] %s\n", topic, line);

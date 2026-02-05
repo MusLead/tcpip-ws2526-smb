@@ -6,8 +6,10 @@ BUILD_DIR=build
 # Output directory for binaries
 BIN_DIR=bin
 
-BINARIES=smbbroker smbpublish smbsubscribe smbpublish_loop smbpublish_interactive
-OBJ_FILES=$(BINARIES:%=$(BUILD_DIR)/%.o)
+BINARIES=smbbroker smbpublish smbsubscribe smbpublish_loop smbpublish_interactive smbkeygen
+SECURE_OBJ=$(BUILD_DIR)/smb_secure.o
+OBJ_FILES=$(BINARIES:%=$(BUILD_DIR)/%.o) $(SECURE_OBJ)
+KEY_FILE=$(BUILD_DIR)/.key
 BIN_PATHS=$(BINARIES:%=$(BIN_DIR)/%)
 ARGS?=
 BROKER_ARGS?=
@@ -30,7 +32,7 @@ SUBSCRIBE_RUN_ARGS=$(if $(SUBSCRIBE_ARGS),$(SUBSCRIBE_ARGS),$(if $(ARGS),$(ARGS)
 PUBLISH_LOOP_RUN_ARGS=$(if $(PUBLISH_LOOP_ARGS),$(PUBLISH_LOOP_ARGS),$(if $(ARGS),$(ARGS),$(RUN_ARGS)))
 INTERACTIVE_RUN_ARGS=$(if $(INTERACTIVE_ARGS),$(INTERACTIVE_ARGS),$(if $(ARGS),$(ARGS),$(RUN_ARGS)))
 
-all: $(BIN_PATHS)
+all: $(BIN_PATHS) $(KEY_FILE)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -38,23 +40,29 @@ $(BUILD_DIR):
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-$(BUILD_DIR)/%.o: %.c smb.h | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: %.c smb.h smb_secure.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BIN_DIR)/smbbroker: $(BUILD_DIR)/smbbroker.o | $(BIN_DIR)
+$(BIN_DIR)/smbbroker: $(BUILD_DIR)/smbbroker.o $(SECURE_OBJ) | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(BIN_DIR)/smbpublish: $(BUILD_DIR)/smbpublish.o $(SECURE_OBJ) | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(BIN_DIR)/smbsubscribe: $(BUILD_DIR)/smbsubscribe.o $(SECURE_OBJ) | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(BIN_DIR)/smbpublish_loop: $(BUILD_DIR)/smbpublish_loop.o $(SECURE_OBJ) | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(BIN_DIR)/smbpublish_interactive: $(BUILD_DIR)/smbpublish_interactive.o $(SECURE_OBJ) | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(BIN_DIR)/smbkeygen: $(BUILD_DIR)/smbkeygen.o | $(BIN_DIR)
 	$(CC) $(CFLAGS) -o $@ $<
 
-$(BIN_DIR)/smbpublish: $(BUILD_DIR)/smbpublish.o | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $<
-
-$(BIN_DIR)/smbsubscribe: $(BUILD_DIR)/smbsubscribe.o | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $<
-
-$(BIN_DIR)/smbpublish_loop: $(BUILD_DIR)/smbpublish_loop.o | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $<
-
-$(BIN_DIR)/smbpublish_interactive: $(BUILD_DIR)/smbpublish_interactive.o | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $<
+$(KEY_FILE): $(BIN_DIR)/smbkeygen | $(BUILD_DIR)
+	@if [ ! -f $@ ]; then ./$(BIN_DIR)/smbkeygen $@; fi
 
 run-broker: $(BIN_DIR)/smbbroker
 	./$(BIN_DIR)/smbbroker $(BROKER_RUN_ARGS)

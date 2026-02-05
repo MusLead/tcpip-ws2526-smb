@@ -1,4 +1,5 @@
 #include "smb.h"
+#include "smb_secure.h"
 
 typedef struct
 {
@@ -131,7 +132,7 @@ static void print_addr(const struct sockaddr_in *a, char *buf, size_t buflen)
  * @param message The output message buffer.
  * @param retFlag Output flag: 1=success, 3=error.
  */
-void parsePackage(char packet[1400], char topic[256], char message[1024], int *retFlag)
+void parsePackage(const char *packet, char topic[256], char message[1024], int *retFlag)
 {
     *retFlag = 1;
     // Parse topic first, then remainder as message (including spaces)
@@ -175,19 +176,30 @@ void parsePackage(char packet[1400], char topic[256], char message[1024], int *r
 
 int main(int argc, char **argv)
 {
-    int port = BROKER_PORT;
-    if (argc == 2)
+    const char *key_path = NULL;
+    char *pos[1];
+    int pos_count = smb_parse_key_and_pos(argc, argv, &key_path, pos, 1);
+    if (pos_count < 0 || pos_count > 1)
     {
-        port = atoi(argv[1]);
+        fprintf(stderr, "Usage: %s [port] [--key[=<path>]]\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    int port = BROKER_PORT;
+    if (pos_count == 1)
+    {
+        port = atoi(pos[0]);
         if (port <= 0 || port > 65535)
         {
-            fprintf(stderr, "Invalid: Port should be between 1 and 65535\nUsage: %s [port]\n", argv[0]);
+            fprintf(stderr, "Invalid: Port should be between 1 and 65535\nUsage: %s [port] [--key[=<path>]]\n", argv[0]);
             return EXIT_FAILURE;
         }
     }
-    else if (argc != 1)
+
+    uint8_t key[SMB_KEY_LEN];
+    if (smb_load_key(key, key_path) != 0)
     {
-        fprintf(stderr, "Expect arguments only 1 or 2 (program name and optional port)\nUsage: %s [port]\n", argv[0]);
+        fprintf(stderr, "Missing key. Use --key[=<path>], or set SMB_KEY, or create %s\n", SMB_DEFAULT_KEY_PATH);
         return EXIT_FAILURE;
     }
 
@@ -213,7 +225,7 @@ int main(int argc, char **argv)
     // Unlimited loop
     for (;;)
     {
-        char packet[PACKET_MAX]; // packet is topic+message
+        uint8_t packet[PACKET_MAX];
         // sender address
         struct sockaddr_in src;
         socklen_t srclen = sizeof(src);
@@ -225,21 +237,29 @@ int main(int argc, char **argv)
             perror("Error receiving packet");
             continue;
         }
-        packet[n] = '\0';
+        uint8_t plain[PACKET_MAX];
+        size_t plain_len = 0;
+        if (smb_secure_unpack(key, packet, (size_t)n, plain, sizeof(plain) - 1, &plain_len) != 0)
+        {
+            fprintf(stderr, "Dropped packet: authentication/decryption failed\n");
+            continue;
+        }
+        plain[plain_len] = '\0';
+        const char *packet_str = (const char *)plain;
 
         // Determine command
 
         // if SUB comes, add to subscriber list or update existing
-        if (strncmp(packet, "SUB ", 4) == 0)
+        if (strncmp(packet_str, "SUB ", 4) == 0)
         {
             char topic[TOPIC_MAX];
             unsigned int sub_port = 0;
 
             // "SUB <topic> <port>"
-            if (sscanf(packet + 4, "%255s %u", topic, &sub_port) != 2 ||
+            if (sscanf(packet_str + 4, "%255s %u", topic, &sub_port) != 2 ||
                 sub_port == 0 || sub_port > 65535)
             {
-                fprintf(stderr, "Invalid SUB packet: %s\n", packet);
+                fprintf(stderr, "Invalid SUB packet: %s\n", packet_str);
                 continue;
             }
             if (!is_valid_sub_topic(topic))
@@ -259,16 +279,16 @@ int main(int argc, char **argv)
         }
 
         // if UNSUB comes, remove from subscriber list
-        if (strncmp(packet, "UNSUB ", 6) == 0)
+        if (strncmp(packet_str, "UNSUB ", 6) == 0)
         {
             char topic[TOPIC_MAX];
             unsigned int sub_port = 0;
 
             // "UNSUB <topic> <port>"
-            if (sscanf(packet + 6, "%255s %u", topic, &sub_port) != 2 ||
+            if (sscanf(packet_str + 6, "%255s %u", topic, &sub_port) != 2 ||
                 sub_port == 0 || sub_port > 65535)
             {
-                fprintf(stderr, "Invalid UNSUB packet: %s\n", packet);
+                fprintf(stderr, "Invalid UNSUB packet: %s\n", packet_str);
                 continue;
             }
             if (!is_valid_sub_topic(topic))
@@ -286,14 +306,14 @@ int main(int argc, char **argv)
         }
 
         // if PUB comes, forward the message to matching subscribers
-        if (strncmp(packet, "PUB ", 4) == 0)
+        if (strncmp(packet_str, "PUB ", 4) == 0)
         {
             // "PUB <topic> <message...>"
             char topic[TOPIC_MAX];
             char message[MESSAGE_MAX];
 
             int retFlag;
-            parsePackage(packet, topic, message, &retFlag);
+            parsePackage(packet_str, topic, message, &retFlag);
             if (retFlag == 3)
                 continue;
 
@@ -304,8 +324,19 @@ int main(int argc, char **argv)
             fflush(stdout);
 
             // Forward to matching subscribers
-            char out[PACKET_MAX]; 
-            snprintf(out, sizeof(out), "MSG %s %s", topic, message);
+            char out_plain[PACKET_MAX];
+            snprintf(out_plain, sizeof(out_plain), "MSG %s %s", topic, message);
+            uint8_t out_pkt[PACKET_MAX];
+            size_t out_len = smb_secure_pack(key,
+                                             (const uint8_t *)out_plain,
+                                             strlen(out_plain),
+                                             out_pkt,
+                                             sizeof(out_pkt));
+            if (out_len == 0)
+            {
+                fprintf(stderr, "Failed to secure outbound message\n");
+                continue;
+            }
 
             int forwarded = 0;
             for (size_t s = 0; s < subs_len; s++)
@@ -316,7 +347,7 @@ int main(int argc, char **argv)
                 struct sockaddr_in dst = subs[s].addr;
                 dst.sin_port = htons(subs[s].port);
 
-                ssize_t sent = sendto(sock, out, strlen(out), 0, (struct sockaddr *)&dst, sizeof(dst));
+                ssize_t sent = sendto(sock, out_pkt, out_len, 0, (struct sockaddr *)&dst, sizeof(dst));
                 if (sent < 0)
                 {
                     perror("Error sending packet to subscriber");
@@ -331,7 +362,7 @@ int main(int argc, char **argv)
         }
 
         // Otherwise, unknown packet
-        fprintf(stderr, "Unknown packet: %s\n", packet);
+        fprintf(stderr, "Unknown packet: %s\n", packet_str);
     }
 
     close(sock);

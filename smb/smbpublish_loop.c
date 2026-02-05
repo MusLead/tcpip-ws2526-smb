@@ -1,4 +1,5 @@
 #include "smb.h"
+#include "smb_secure.h"
 #include <signal.h>
 #include <time.h>
 
@@ -21,17 +22,20 @@ static int parse_interval(const char *s, unsigned int *out) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 4 || argc > 5) {
-        fprintf(stderr, "Usage: %s broker topic interval_seconds [prefix]\n", argv[0]);
-        fprintf(stderr, "Example: %s localhost zimmer/temperatur 30\n", argv[0]);
-        fprintf(stderr, "Example: %s 127.0.0.1 zimmer/luftfeuchte 10 sensor1\n", argv[0]);
+    const char *key_path = NULL;
+    char *pos[4];
+    int pos_count = smb_parse_key_and_pos(argc, argv, &key_path, pos, 4);
+    if (pos_count < 3 || pos_count > 4) {
+        fprintf(stderr, "Usage: %s broker topic interval_seconds [prefix] [--key[=<path>]]\n", argv[0]);
+        fprintf(stderr, "Example: %s localhost zimmer/temperatur 30 --key\n", argv[0]);
+        fprintf(stderr, "Example: %s 127.0.0.1 zimmer/luftfeuchte 10 sensor1 --key=build/.key\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    const char *broker = argv[1];
-    const char *topic = argv[2];
-    const char *interval_str = argv[3];
-    const char *prefix = (argc == 5) ? argv[4] : NULL;
+    const char *broker = pos[0];
+    const char *topic = pos[1];
+    const char *interval_str = pos[2];
+    const char *prefix = (pos_count == 4) ? pos[3] : NULL;
 
     if (strlen(topic) >= TOPIC_MAX) {
         fprintf(stderr, "Topic too long (max %d)\n", TOPIC_MAX - 1);
@@ -45,6 +49,12 @@ int main(int argc, char **argv) {
     unsigned int interval = 0;
     if (parse_interval(interval_str, &interval) != 0) {
         fprintf(stderr, "Invalid interval_seconds: %s (1..86400)\n", interval_str);
+        return EXIT_FAILURE;
+    }
+
+    uint8_t key[SMB_KEY_LEN];
+    if (smb_load_key(key, key_path) != 0) {
+        fprintf(stderr, "Missing key. Use --key[=<path>], or set SMB_KEY, or create %s\n", SMB_DEFAULT_KEY_PATH);
         return EXIT_FAILURE;
     }
 
@@ -83,10 +93,16 @@ int main(int argc, char **argv) {
             snprintf(msg, sizeof(msg), "%lu %s", counter, ts);
         }
 
-        char pkt[PACKET_MAX];
-        snprintf(pkt, sizeof(pkt), "PUB %s %s", topic, msg);
+        char plain[PACKET_MAX];
+        snprintf(plain, sizeof(plain), "PUB %s %s", topic, msg);
+        uint8_t pkt[PACKET_MAX];
+        size_t pkt_len = smb_secure_pack(key, (const uint8_t *)plain, strlen(plain), pkt, sizeof(pkt));
+        if (pkt_len == 0) {
+            fprintf(stderr, "Message too large to secure\n");
+            break;
+        }
 
-        if (sendto(sock, pkt, strlen(pkt), 0, (struct sockaddr *)&broker_addr, sizeof(broker_addr)) < 0) {
+        if (sendto(sock, pkt, pkt_len, 0, (struct sockaddr *)&broker_addr, sizeof(broker_addr)) < 0) {
             perror("sendto PUB");
         } else {
             printf("[PUB] %s\n", msg);

@@ -97,4 +97,37 @@ static inline int is_valid_sub_topic(const char *topic) {
     return 1;
 }
 
+/**
+ * Parse optional --key argument and collect positional args.
+ * Returns the number of positional args, or a negative value on error.
+ * If --key is provided without a value, *key_path is set to empty string.
+ */
+static inline int smb_parse_key_and_pos(int argc, char **argv, const char **key_path, char **pos, int pos_cap) {
+    int pos_count = 0;
+    if (key_path) *key_path = NULL;
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        if (strcmp(arg, "--key") == 0) {
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                if (key_path) *key_path = argv[i + 1];
+                i++;
+            } else {
+                if (key_path) *key_path = "";
+            }
+            continue;
+        }
+        if (strncmp(arg, "--key=", 6) == 0) {
+            const char *val = arg + 6;
+            if (key_path) *key_path = val;
+            continue;
+        }
+        if (arg[0] == '-') {
+            return -1;
+        }
+        if (pos_count >= pos_cap) return -1;
+        pos[pos_count++] = argv[i];
+    }
+    return pos_count;
+}
+
 #endif
