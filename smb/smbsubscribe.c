@@ -5,10 +5,12 @@
  *
  *  MAIN FEATURE
  *  Subscribes to a topic and prints MSG packets.
+ *  Supports wildcard '#' for "all topics" 
  *  Usage: smbsubscribe <broker> <topic>.
  * 
  *  ADDITIONAL FEATURE
  *  Graceful shutdown on SIGINT: sends UNSUB before exiting.
+ *  Supports wildcard "prefix/#" for all subtopics.
  */
 #include "smb.h"
 #include <signal.h>

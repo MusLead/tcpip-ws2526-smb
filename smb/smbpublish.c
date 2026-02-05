@@ -5,7 +5,11 @@
  *  
  *  MAIN FEATURE
  *  Sends a single PUB <topic> <message> to the broker and exits.
+ *  Rejects invalid topics (empty orwith wildcard).
  *  Usage: smbpublish <broker> <topic> <message>.
+ * 
+ *  ADDITIONAL FEATURE
+ *  Supports levelled topics like "zimmer/temperatur" and "zimmer/luftfeuchte".
  */
 #include "smb.h"
 
