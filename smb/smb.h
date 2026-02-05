@@ -114,9 +114,10 @@ static inline int is_valid_sub_topic(const char *topic) {
     }
 
     const char *slash = strchr(topic, '/');
-    if (!slash) return 0;
-    if (slash == topic) return 0;
-    if (topic[strlen(topic) - 1] == '/') return 0;
+    if (slash) {
+        if (slash == topic) return 0;
+        if (topic[strlen(topic) - 1] == '/') return 0;
+    }
     return 1;
 }
 
