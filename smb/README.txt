@@ -53,14 +53,17 @@ Wildcards:
 - Publisher may NOT publish with #.
 
 BUILD
-The project uses a shared header (smb.h) across multiple C files, so a Makefile
-ensures consistent compilation and linking. Make sure that all C code files, 
-including the Makefile, are in the same folder. 
-For example, the folder could be called "smb"
+Keep all source files in one folder (e.g., smb). Compile with gcc and place
+outputs in bin/.
 
 Commands:
   cd smb
-  make
+  mkdir -p bin
+  gcc -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L smbbroker.c -o bin/smbbroker
+  gcc -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L smbpublish.c -o bin/smbpublish
+  gcc -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L smbsubscribe.c -o bin/smbsubscribe
+  gcc -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L smbpublish_loop.c -o bin/smbpublish_loop
+  gcc -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L smbpublish_interactive.c -o bin/smbpublish_interactive
 
 HOW TO EXECUTE (BINARIES)
 Binaries are created in bin/:
@@ -70,14 +73,6 @@ Binaries are created in bin/:
   (sends counter + timestamp; optional prefix)
 - bin/smbpublish_interactive <BROKER> <TOPIC>
 - bin/smbsubscribe <BROKER> <TOPIC>
-
-OPTIONAL MAKE SHORTCUTS
-- make run-broker 8080
-- make run-publish localhost zimmer/temperatur 08.02.2021
-- make run-publish localhost zimmer "Welcome Home"
-- make run-publish-loop localhost zimmer/temperatur 30
-- make run-publish-interactive localhost zimmer/temperatur
-- make run-subscribe localhost zimmer/#
 
 RUN (LOCAL EXAMPLE)
 Terminal 1:

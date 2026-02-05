@@ -1,13 +1,10 @@
 CC=gcc
 CFLAGS=-std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=200112L
 
-# Build directory for object files
-BUILD_DIR=build
 # Output directory for binaries
 BIN_DIR=bin
 
 BINARIES=smbbroker smbpublish smbsubscribe smbpublish_loop smbpublish_interactive
-OBJ_FILES=$(BINARIES:%=$(BUILD_DIR)/%.o)
 BIN_PATHS=$(BINARIES:%=$(BIN_DIR)/%)
 ARGS?=
 BROKER_ARGS?=
@@ -32,29 +29,23 @@ INTERACTIVE_RUN_ARGS=$(if $(INTERACTIVE_ARGS),$(INTERACTIVE_ARGS),$(if $(ARGS),$
 
 all: $(BIN_PATHS)
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-$(BUILD_DIR)/%.o: %.c smb.h | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+$(BIN_DIR)/smbbroker: smbbroker.c smb.h | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ smbbroker.c
 
-$(BIN_DIR)/smbbroker: $(BUILD_DIR)/smbbroker.o | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $<
+$(BIN_DIR)/smbpublish: smbpublish.c smb.h | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ smbpublish.c
 
-$(BIN_DIR)/smbpublish: $(BUILD_DIR)/smbpublish.o | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $<
+$(BIN_DIR)/smbsubscribe: smbsubscribe.c smb.h | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ smbsubscribe.c
 
-$(BIN_DIR)/smbsubscribe: $(BUILD_DIR)/smbsubscribe.o | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $<
+$(BIN_DIR)/smbpublish_loop: smbpublish_loop.c smb.h | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ smbpublish_loop.c
 
-$(BIN_DIR)/smbpublish_loop: $(BUILD_DIR)/smbpublish_loop.o | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $<
-
-$(BIN_DIR)/smbpublish_interactive: $(BUILD_DIR)/smbpublish_interactive.o | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $<
+$(BIN_DIR)/smbpublish_interactive: smbpublish_interactive.c smb.h | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ smbpublish_interactive.c
 
 run-broker: $(BIN_DIR)/smbbroker
 	./$(BIN_DIR)/smbbroker $(BROKER_RUN_ARGS)
@@ -73,7 +64,6 @@ run-publish-interactive: $(BIN_DIR)/smbpublish_interactive
 
 clean:
 	rm -f $(BIN_PATHS)
-	rm -rf $(BUILD_DIR)
 	rm -rf $(BIN_DIR)
 
 .PHONY: all clean run-broker run-publish run-subscribe run-publish-loop run-publish-interactive
